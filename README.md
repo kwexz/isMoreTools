@@ -22,6 +22,31 @@ npm run dev
 npm run build
 ```
 
+## Docker Deployment
+
+The app is statically exported by Next.js and served by nginx in the runtime image.
+
+Build and run with Docker:
+
+```bash
+docker build -t ismoretools:latest .
+docker run -d --name ismoretools --restart unless-stopped -p 8080:80 ismoretools:latest
+```
+
+Or with Docker Compose:
+
+```bash
+docker compose up -d --build
+```
+
+Then open:
+
+```text
+http://your-server-ip:8080
+```
+
+For production behind a reverse proxy, point Nginx/Caddy/Traefik to the container port `80`.
+
 The project is configured for static export in `next.config.ts`:
 
 ```ts
@@ -57,32 +82,32 @@ types/
 - Rich Text to Markdown
 - Diff Checker
 - Word/Character Counter
+- Clean Extra Spaces
 - Change Case
+- Transliteration
 - Slug Generator
 - Remove Duplicate Lines
 - Sort Lines
 - Extract Emails/URLs
+- Lorem Ipsum Generator
 - MIME Type Viewer
 - File Checksum Generator
 - Compare Two Files
-- Resize Images
-- Convert Images
-- Placeholder Generator
-
-## Planned / Basic Catalog Entries
-
-- Clean Extra Spaces
-- Transliteration
-- Text Diff
-- Lorem Ipsum Generator
-- File Size Converter
 - Batch Rename Preview
 - Generate Checksum File
+- Resize Images
 - Compress PNG/JPEG/WebP
+- Convert Images
 - Crop Image
 - Remove Image Metadata
 - Generate Favicon Set
 - Extract Color Palette
+- Placeholder Generator
+
+## Planned / Basic Catalog Entries
+
+- Text Diff
+- File Size Converter
 
 ## Privacy Model
 

@@ -1,0 +1,10 @@
+services:
+  ismoretools:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ismoretools:latest
+    container_name: ismoretools
+    restart: unless-stopped
+    ports:
+      - "8080:80"

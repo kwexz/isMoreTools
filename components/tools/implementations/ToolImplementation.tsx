@@ -526,6 +526,96 @@ function PlannedTool() {
   return <div className="rounded-2xl border border-dashed bg-muted/30 p-10 text-center"><h2 className="text-xl font-semibold">Planned tool</h2><p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-muted-foreground">This tool is already in the catalog with route, metadata, privacy note, and page structure. The full local implementation is intentionally deferred.</p></div>;
 }
 
+function CropImageTool() {
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState("");
+  const [natural, setNatural] = useState({ width: 0, height: 0 });
+  const [x, setX] = useState(0);
+  const [y, setY] = useState(0);
+  const [width, setWidth] = useState(512);
+  const [height, setHeight] = useState(512);
+  const [aspect, setAspect] = useState("free");
+  const [format, setFormat] = useState("image/png");
+  const [quality, setQuality] = useState(0.9);
+  const [output, setOutput] = useState("");
+
+  async function pick(files: File[]) {
+    const next = files[0] ?? null;
+    setFile(next);
+    setOutput("");
+    if (!next) {
+      setPreview("");
+      return;
+    }
+    const url = URL.createObjectURL(next);
+    const image = new Image();
+    await new Promise<void>((resolve, reject) => {
+      image.onload = () => resolve();
+      image.onerror = () => reject(new Error("Could not read image."));
+      image.src = url;
+    });
+    URL.revokeObjectURL(url);
+    const side = Math.min(image.naturalWidth, image.naturalHeight);
+    setNatural({ width: image.naturalWidth, height: image.naturalHeight });
+    setX(Math.floor((image.naturalWidth - side) / 2));
+    setY(Math.floor((image.naturalHeight - side) / 2));
+    setWidth(side);
+    setHeight(side);
+    setPreview(URL.createObjectURL(next));
+  }
+
+  function applyAspect(nextAspect: string) {
+    setAspect(nextAspect);
+    if (!natural.width || nextAspect === "free") return;
+    const ratio = nextAspect === "1:1" ? 1 : nextAspect === "16:9" ? 16 / 9 : 4 / 3;
+    const maxWidth = natural.width - x;
+    const maxHeight = natural.height - y;
+    let nextWidth = maxWidth;
+    let nextHeight = Math.round(nextWidth / ratio);
+    if (nextHeight > maxHeight) {
+      nextHeight = maxHeight;
+      nextWidth = Math.round(nextHeight * ratio);
+    }
+    setWidth(Math.max(1, nextWidth));
+    setHeight(Math.max(1, nextHeight));
+  }
+
+  async function crop() {
+    try {
+      if (!file) throw new Error("Choose an image first.");
+      const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = () => {
+          URL.revokeObjectURL(url);
+          resolve(img);
+        };
+        img.onerror = () => reject(new Error("Could not read image."));
+        img.src = url;
+      });
+      const sx = Math.max(0, Math.min(x, image.naturalWidth - 1));
+      const sy = Math.max(0, Math.min(y, image.naturalHeight - 1));
+      const sw = Math.max(1, Math.min(width, image.naturalWidth - sx));
+      const sh = Math.max(1, Math.min(height, image.naturalHeight - sy));
+      const canvas = document.createElement("canvas");
+      canvas.width = sw;
+      canvas.height = sh;
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("Canvas is not available.");
+      context.drawImage(image, sx, sy, sw, sh, 0, 0, sw, sh);
+      const blob = await canvasToBlob(canvas, format, format === "image/png" ? undefined : quality);
+      const ext = format.split("/")[1].replace("jpeg", "jpg");
+      downloadBlob(blob, `cropped-${file.name.replace(/\.[^.]+$/, "")}.${ext}`);
+      setOutput(`Crop: x=${sx}, y=${sy}, ${sw}x${sh}\nOutput: ${format}, ${formatBytes(blob.size)}`);
+      toast.success("Image cropped locally.");
+    } catch (err) {
+      setOutput(err instanceof Error ? err.message : "Crop failed.");
+    }
+  }
+
+  return <div className="space-y-5"><FileDropzone accept="image/*" onFiles={pick} label="Choose image" />{preview ? <img src={preview} alt="" className="max-h-80 rounded-2xl border object-contain" /> : null}{natural.width ? <p className="text-sm text-muted-foreground">Source: {natural.width}x{natural.height}. Enter crop coordinates in source pixels.</p> : null}<div className="grid gap-3 md:grid-cols-4"><Field label="X"><Input type="number" min={0} value={x} onChange={(e) => setX(Number(e.target.value))} /></Field><Field label="Y"><Input type="number" min={0} value={y} onChange={(e) => setY(Number(e.target.value))} /></Field><Field label="Width"><Input type="number" min={1} value={width} onChange={(e) => setWidth(Number(e.target.value))} /></Field><Field label="Height"><Input type="number" min={1} value={height} onChange={(e) => setHeight(Number(e.target.value))} /></Field><Field label="Aspect"><Select value={aspect} onChange={(e) => applyAspect(e.target.value)}><option value="free">Free</option><option value="1:1">1:1</option><option value="16:9">16:9</option><option value="4:3">4:3</option></Select></Field><Field label="Format"><Select value={format} onChange={(e) => setFormat(e.target.value)}><option value="image/png">PNG</option><option value="image/jpeg">JPEG</option><option value="image/webp">WebP</option></Select></Field><Field label={`Quality ${Math.round(quality * 100)}%`}><Input type="range" min="0.1" max="1" step="0.01" value={quality} disabled={format === "image/png"} onChange={(e) => setQuality(Number(e.target.value))} /></Field></div><Button onClick={crop}>Crop and download</Button><OutputPanel value={output} /><HowItWorks>The image is loaded locally, the selected source rectangle is drawn to Canvas, and the crop is exported as a local Blob download.</HowItWorks></div>;
+}
+
 function ImageTool({ mode }: { mode: "resize" | "compress" | "convert" | "metadata" | "favicon" | "palette" | "placeholder" | "crop" }) {
   const [file, setFile] = useState<File | null>(null), [preview, setPreview] = useState(""), [output, setOutput] = useState(""), [width, setWidth] = useState(512), [height, setHeight] = useState(512), [quality, setQuality] = useState(0.82), [format, setFormat] = useState("image/png"), [bg, setBg] = useState("#e2e8f0"), [fg, setFg] = useState("#0f172a"), [text, setText] = useState("512 × 512");
   const fileUrl = useObjectUrl(file);
@@ -566,15 +656,25 @@ export function ToolImplementation({ slug }: ToolProps) {
     case "rich-text-to-markdown": return <RichTextToMarkdown />;
     case "diff-checker": return <DiffTool />;
     case "word-counter": return <WordCounter />;
+    case "clean-extra-spaces": return <CleanSpaces />;
     case "change-case": return <ChangeCaseTool />;
+    case "transliteration": return <TransliterationTool />;
     case "slug-generator": return <TransliterationTool slugOnly />;
     case "remove-duplicate-lines": return <DuplicateLines />;
     case "sort-lines": return <SortLines />;
     case "extract-emails-urls": return <ExtractEmailsUrls />;
+    case "lorem-ipsum": return <LoremGenerator />;
     case "mime-type-viewer": return <MimeViewer />;
     case "compare-files": return <CompareFiles />;
+    case "batch-rename-preview": return <BatchRenamePreview />;
+    case "generate-checksum-file": return <ChecksumFile />;
     case "resize-images": return <ResizeImageTool />;
+    case "compress-images": return <ImageTool mode="compress" />;
     case "convert-images": return <ConvertImageTool />;
+    case "crop-image": return <CropImageTool />;
+    case "remove-image-metadata": return <ImageTool mode="metadata" />;
+    case "favicon-generator": return <ImageTool mode="favicon" />;
+    case "extract-color-palette": return <ImageTool mode="palette" />;
     case "placeholder-generator": return <PlaceholderGenerator />;
     default: return <PlannedTool />;
   }
