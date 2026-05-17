@@ -3,7 +3,7 @@ import { ArrowRight, Lock, MonitorSmartphone, Search, ShieldCheck } from "lucide
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ToolSearch } from "@/components/tools/ToolSearch";
+import { CategorizedToolCatalog } from "@/components/tools/CategorizedToolCatalog";
 import { ToolIcon } from "@/components/tools/icon-map";
 import { categories, getToolsByCategory, tools } from "@/data/tools";
 
@@ -78,11 +78,11 @@ export default function HomePage() {
       </section>
 
       <section id="featured" className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold tracking-tight">Find a tool</h2>
-          <p className="mt-2 text-muted-foreground">Search by name, format, category, or tag.</p>
-        </div>
-        <ToolSearch tools={tools} />
+        <CategorizedToolCatalog
+          tools={tools}
+          heading="Tools by category"
+          description="Search first, then browse matching tools inside their workflow categories."
+        />
       </section>
     </div>
   );

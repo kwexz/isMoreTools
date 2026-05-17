@@ -14,7 +14,12 @@ export const metadata: Metadata = {
   },
   description:
     "Privacy-friendly browser tools for developers, text, files, and images. All operations run locally in your browser.",
-  metadataBase: new URL("https://ismoretools.local")
+  metadataBase: new URL("https://ismoretools.local"),
+  icons: {
+    icon: "/favicon.svg",
+    shortcut: "/favicon.svg",
+    apple: "/brands/logo.svg"
+  }
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

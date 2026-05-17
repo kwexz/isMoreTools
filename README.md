@@ -39,6 +39,19 @@ Or with Docker Compose:
 docker compose up -d --build
 ```
 
+If you prefer to build locally and deploy only the exported static files, run:
+
+```bash
+npm install
+npm run build
+```
+
+Copy `out/`, `nginx.conf`, and `docker-compose.static.yml` to the server, then start nginx-only Docker Compose:
+
+```bash
+docker compose -f docker-compose.static.yml up -d
+```
+
 Then open:
 
 ```text
@@ -98,6 +111,7 @@ types/
 - Resize Images
 - Compress PNG/JPEG/WebP
 - Convert Images
+- PNG to SVG Converter
 - Crop Image
 - Remove Image Metadata
 - Generate Favicon Set

@@ -480,6 +480,80 @@ function ConvertImageTool() {
   return <div className="space-y-5"><FileDropzone accept="image/*" onFiles={pick} label="Choose image" />{preview ? <img src={preview} alt="" className="max-h-80 rounded-2xl border object-contain" /> : null}<div className="grid gap-3 md:grid-cols-2"><Field label="Output format"><Select value={format} onChange={(e) => setFormat(e.target.value)}><option value="image/png">PNG</option><option value="image/jpeg">JPEG</option><option value="image/webp">WebP</option></Select></Field><Field label={`Quality ${Math.round(quality * 100)}%`}><Input type="range" min="0.1" max="1" step="0.01" value={quality} disabled={format === "image/png"} onChange={(e) => setQuality(Number(e.target.value))} /></Field></div><Button onClick={process}>Convert and download</Button><OutputPanel value={output} /><HowItWorks>The browser decodes the image into Canvas and re-encodes it into the selected output format.</HowItWorks></div>;
 }
 
+function PngToSvgTool() {
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState("");
+  const [mode, setMode] = useState<"embed" | "mosaic">("embed");
+  const [maxCells, setMaxCells] = useState(48);
+  const [output, setOutput] = useState("");
+
+  function pick(files: File[]) {
+    const next = files[0] ?? null;
+    setFile(next);
+    setOutput("");
+    setPreview(next ? URL.createObjectURL(next) : "");
+  }
+
+  async function fileToDataUrl(input: File) {
+    return await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(new Error("Could not read PNG."));
+      reader.readAsDataURL(input);
+    });
+  }
+
+  async function convert() {
+    try {
+      if (!file) throw new Error("Choose a PNG first.");
+      if (file.type && file.type !== "image/png") throw new Error("This converter expects a PNG file.");
+      const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = () => {
+          URL.revokeObjectURL(url);
+          resolve(img);
+        };
+        img.onerror = () => reject(new Error("Could not decode PNG."));
+        img.src = url;
+      });
+
+      let svg = "";
+      if (mode === "embed") {
+        const dataUrl = await fileToDataUrl(file);
+        svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${image.naturalWidth}" height="${image.naturalHeight}" viewBox="0 0 ${image.naturalWidth} ${image.naturalHeight}"><image width="${image.naturalWidth}" height="${image.naturalHeight}" href="${dataUrl}"/></svg>`;
+      } else {
+        const scale = Math.max(image.naturalWidth, image.naturalHeight) / Math.max(4, maxCells);
+        const w = Math.max(1, Math.round(image.naturalWidth / scale));
+        const h = Math.max(1, Math.round(image.naturalHeight / scale));
+        const canvas = await canvasFromImage(file, w, h);
+        const context = canvas.getContext("2d");
+        if (!context) throw new Error("Canvas is not available.");
+        const data = context.getImageData(0, 0, w, h).data;
+        const rects: string[] = [];
+        for (let y = 0; y < h; y += 1) {
+          for (let x = 0; x < w; x += 1) {
+            const index = (y * w + x) * 4;
+            const alpha = data[index + 3] / 255;
+            if (alpha < 0.05) continue;
+            const fill = hexFromRgb(data[index], data[index + 1], data[index + 2]);
+            rects.push(`<rect x="${x}" y="${y}" width="1" height="1" fill="${fill}"${alpha < 1 ? ` opacity="${alpha.toFixed(2)}"` : ""}/>`);
+          }
+        }
+        svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${image.naturalWidth}" height="${image.naturalHeight}" viewBox="0 0 ${w} ${h}" shape-rendering="crispEdges">${rects.join("")}</svg>`;
+      }
+
+      downloadBlob(new Blob([svg], { type: "image/svg+xml" }), `${file.name.replace(/\.png$/i, "")}.svg`);
+      setOutput(`${svg.slice(0, 4000)}${svg.length > 4000 ? "\n\n<!-- output truncated in preview -->" : ""}`);
+      toast.success("SVG generated locally.");
+    } catch (err) {
+      setOutput(err instanceof Error ? err.message : "PNG to SVG conversion failed.");
+    }
+  }
+
+  return <div className="space-y-5"><FileDropzone accept="image/png" onFiles={pick} label="Choose PNG" />{preview ? <img src={preview} alt="" className="max-h-80 rounded-2xl border object-contain" /> : null}<div className="grid gap-3 md:grid-cols-2"><Field label="SVG mode"><Select value={mode} onChange={(e) => setMode(e.target.value as "embed" | "mosaic")}><option value="embed">Embed PNG in SVG</option><option value="mosaic">Pixel-vector mosaic</option></Select></Field><Field label="Mosaic max cells"><Input type="number" min={4} max={160} value={maxCells} disabled={mode === "embed"} onChange={(e) => setMaxCells(Number(e.target.value))} /></Field></div><Button onClick={convert}>Convert and download SVG</Button><OutputPanel value={output} title="SVG preview" /><HowItWorks>Embed mode preserves the PNG exactly inside an SVG wrapper. Mosaic mode samples pixels into SVG rectangles; it is real vector markup, but not contour tracing.</HowItWorks></div>;
+}
+
 function PlaceholderGenerator() {
   const [width, setWidth] = useState(1200);
   const [height, setHeight] = useState(630);
@@ -671,6 +745,7 @@ export function ToolImplementation({ slug }: ToolProps) {
     case "resize-images": return <ResizeImageTool />;
     case "compress-images": return <ImageTool mode="compress" />;
     case "convert-images": return <ConvertImageTool />;
+    case "png-to-svg": return <PngToSvgTool />;
     case "crop-image": return <CropImageTool />;
     case "remove-image-metadata": return <ImageTool mode="metadata" />;
     case "favicon-generator": return <ImageTool mode="favicon" />;

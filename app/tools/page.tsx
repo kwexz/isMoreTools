@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { ToolSearch } from "@/components/tools/ToolSearch";
+import { CategorizedToolCatalog } from "@/components/tools/CategorizedToolCatalog";
 import { tools } from "@/data/tools";
 
 export const metadata: Metadata = {
@@ -16,7 +16,11 @@ export default function ToolsPage() {
           Search, filter, and open privacy-friendly utilities that run entirely inside your browser.
         </p>
       </div>
-      <ToolSearch tools={tools} />
+      <CategorizedToolCatalog
+        tools={tools}
+        heading="Tools by category"
+        description="Search and filter the full catalog while keeping tools grouped by category."
+      />
     </div>
   );
 }
