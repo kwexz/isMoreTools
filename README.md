@@ -24,7 +24,7 @@ npm run build
 
 ## Deployment on a clean VPS (Docker + Nginx)
 
-The production setup uses two Nginx instances: the Nginx container serves the static export, while Nginx on the VPS is the public reverse proxy and terminates HTTPS. The container is bound only to `127.0.0.1:8080`, so it is not directly reachable from the Internet.
+The production setup uses two Nginx instances: the Nginx container serves the static export, while Nginx on the VPS is the public reverse proxy and terminates HTTPS. The container is bound only to `127.0.0.1:8090`, so it is not directly reachable from the Internet.
 
 These instructions target Ubuntu 22.04/24.04. Before starting, create an `A`/`AAAA` DNS record for the domain pointing to the VPS and make sure ports 80 and 443 are reachable from the Internet.
 
@@ -52,32 +52,45 @@ sudo ufw allow 'Nginx Full'
 sudo ufw enable
 ```
 
-### 2. Upload and start the application
+### 2. Build locally and upload the static site (recommended for small VPS)
 
-Clone the repository on the VPS (or upload the project files) and run Compose from its directory:
+Do **not** run `docker compose up --build` on a VPS with 1 vCPU and 1 GB RAM: the Next.js production build can exhaust its memory. Build the static site on a development machine or in CI instead:
 
 ```bash
-git clone <REPOSITORY_URL> /opt/ismoretools
-cd /opt/ismoretools
-sudo docker compose up -d --build
-sudo docker compose ps
-curl -I http://127.0.0.1:8080
+npm ci
+npm run build
 ```
 
-`curl` must return a successful HTTP response. The first build happens on the VPS and needs Internet access to download the base images and npm packages. The application has no runtime environment variables, database, or persistent volumes.
+The build creates `out/`. Upload only the static deployment files to the VPS (replace the SSH user and address):
+
+```bash
+ssh <USER>@<SERVER> 'sudo mkdir -p /opt/ismoretools && sudo chown $USER:$USER /opt/ismoretools'
+scp -r out nginx.conf docker-compose.static.yml <USER>@<SERVER>:/opt/ismoretools/
+```
+
+On the VPS, start the lightweight Nginx-only container:
+
+```bash
+cd /opt/ismoretools
+sudo docker compose -f docker-compose.static.yml up -d
+sudo docker compose -f docker-compose.static.yml ps
+curl -I http://127.0.0.1:8090
+```
+
+`curl` must return a successful HTTP response. This deployment does not install Node.js, download npm packages, or build anything on the VPS. The application has no runtime environment variables, database, or persistent volumes.
 
 ### 3. Configure the public Nginx proxy
 
-Replace `example.com` with your domain and create `/etc/nginx/sites-available/ismoretools`:
+Replace `example.com` with your domain and create `/etc/nginx/sites-available/ismoretools`. Use only names that already have a DNS `A`/`AAAA` record pointing to this VPS; for example, do not include `www.example.com` unless that record exists.
 
 ```nginx
 server {
     listen 80;
     listen [::]:80;
-    server_name example.com www.example.com;
+    server_name example.com;
 
     location / {
-        proxy_pass http://127.0.0.1:8080;
+        proxy_pass http://127.0.0.1:8090;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -101,11 +114,11 @@ sudo systemctl reload nginx
 After DNS has propagated, request a Let's Encrypt certificate and let Certbot configure HTTP-to-HTTPS redirect:
 
 ```bash
-sudo certbot --nginx -d example.com -d www.example.com --redirect
+sudo certbot --nginx -d example.com --redirect
 sudo systemctl status certbot.timer
 ```
 
-For a domain without `www`, omit `-d www.example.com` and remove it from `server_name`. Test renewal once:
+To serve `www.example.com` too, first create its DNS record (normally a `CNAME` to `example.com`, or an `A`/`AAAA` record to the same VPS). Add it to `server_name` and then request both names with `-d example.com -d www.example.com`. Test renewal once:
 
 ```bash
 sudo certbot renew --dry-run
@@ -113,40 +126,40 @@ sudo certbot renew --dry-run
 
 The site is now available at `https://example.com`.
 
-### Updating the deployment
+### Updating a static deployment
 
-From `/opt/ismoretools`, fetch the desired revision and rebuild the immutable image:
+Build the new `out/` directory locally, then synchronise it to the VPS and recreate the static container. `--delete` removes static files no longer present in the new build:
 
 ```bash
-git pull
-sudo docker compose up -d --build
-sudo docker image prune -f
+rsync -av --delete out/ <USER>@<SERVER>:/opt/ismoretools/out/
+ssh <USER>@<SERVER> 'cd /opt/ismoretools && sudo docker compose -f docker-compose.static.yml up -d --force-recreate'
 ```
 
 Useful diagnostics:
 
 ```bash
-sudo docker compose ps
-sudo docker compose logs --tail=100 ismoretools
+sudo docker compose -f docker-compose.static.yml ps
+sudo docker compose -f docker-compose.static.yml logs --tail=100 ismoretools
 sudo nginx -t
 ```
 
-### Alternative: build static files outside the VPS
+#### `502 Bad Gateway` troubleshooting
 
-If the VPS should not run the Node.js build, build the static export on a compatible machine:
-
-```bash
-npm ci
-npm run build
-```
-
-Copy `out/`, `nginx.conf`, and `docker-compose.static.yml` to a directory on the VPS, then start the static Nginx container:
+`502 Bad Gateway` means the host Nginx cannot reach the static-site container. On the VPS, run:
 
 ```bash
-sudo docker compose -f docker-compose.static.yml up -d
+cd /opt/ismoretools
+sudo docker compose -f docker-compose.static.yml up -d --force-recreate
+sudo docker compose -f docker-compose.static.yml ps
+sudo docker compose -f docker-compose.static.yml logs --tail=100 ismoretools
+curl -I http://127.0.0.1:8090
 ```
 
-That compose file listens on `127.0.0.1:8090`; in the Nginx proxy configuration above, change `proxy_pass` to `http://127.0.0.1:8090`.
+The last command must return an HTTP response. If it does, ensure the host Nginx configuration contains exactly `proxy_pass http://127.0.0.1:8090;`, then apply it:
+
+```bash
+sudo nginx -t && sudo systemctl reload nginx
+```
 
 The project is configured for static export in `next.config.ts`:
 
