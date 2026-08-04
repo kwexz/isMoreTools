@@ -22,43 +22,131 @@ npm run dev
 npm run build
 ```
 
-## Docker Deployment
+## Deployment on a clean VPS (Docker + Nginx)
 
-The app is statically exported by Next.js and served by nginx in the runtime image.
+The production setup uses two Nginx instances: the Nginx container serves the static export, while Nginx on the VPS is the public reverse proxy and terminates HTTPS. The container is bound only to `127.0.0.1:8080`, so it is not directly reachable from the Internet.
 
-Build and run with Docker:
+These instructions target Ubuntu 22.04/24.04. Before starting, create an `A`/`AAAA` DNS record for the domain pointing to the VPS and make sure ports 80 and 443 are reachable from the Internet.
+
+### 1. Prepare the server
+
+Connect by SSH and install Docker, Compose, Nginx, and Certbot:
 
 ```bash
-docker build -t ismoretools:latest .
-docker run -d --name ismoretools --restart unless-stopped -p 8080:80 ismoretools:latest
+sudo apt update
+sudo apt install -y ca-certificates curl gnupg nginx certbot python3-certbot-nginx
+
+sudo install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+sudo chmod a+r /etc/apt/keyrings/docker.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo $VERSION_CODENAME) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt update
+sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 ```
 
-Or with Docker Compose:
+If UFW is enabled, allow SSH before enabling the firewall, then allow web traffic:
 
 ```bash
-docker compose up -d --build
+sudo ufw allow OpenSSH
+sudo ufw allow 'Nginx Full'
+sudo ufw enable
 ```
 
-If you prefer to build locally and deploy only the exported static files, run:
+### 2. Upload and start the application
+
+Clone the repository on the VPS (or upload the project files) and run Compose from its directory:
 
 ```bash
-npm install
+git clone <REPOSITORY_URL> /opt/ismoretools
+cd /opt/ismoretools
+sudo docker compose up -d --build
+sudo docker compose ps
+curl -I http://127.0.0.1:8080
+```
+
+`curl` must return a successful HTTP response. The first build happens on the VPS and needs Internet access to download the base images and npm packages. The application has no runtime environment variables, database, or persistent volumes.
+
+### 3. Configure the public Nginx proxy
+
+Replace `example.com` with your domain and create `/etc/nginx/sites-available/ismoretools`:
+
+```nginx
+server {
+    listen 80;
+    listen [::]:80;
+    server_name example.com www.example.com;
+
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+Enable the configuration and verify it:
+
+```bash
+sudo ln -s /etc/nginx/sites-available/ismoretools /etc/nginx/sites-enabled/ismoretools
+sudo rm -f /etc/nginx/sites-enabled/default
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+### 4. Enable HTTPS
+
+After DNS has propagated, request a Let's Encrypt certificate and let Certbot configure HTTP-to-HTTPS redirect:
+
+```bash
+sudo certbot --nginx -d example.com -d www.example.com --redirect
+sudo systemctl status certbot.timer
+```
+
+For a domain without `www`, omit `-d www.example.com` and remove it from `server_name`. Test renewal once:
+
+```bash
+sudo certbot renew --dry-run
+```
+
+The site is now available at `https://example.com`.
+
+### Updating the deployment
+
+From `/opt/ismoretools`, fetch the desired revision and rebuild the immutable image:
+
+```bash
+git pull
+sudo docker compose up -d --build
+sudo docker image prune -f
+```
+
+Useful diagnostics:
+
+```bash
+sudo docker compose ps
+sudo docker compose logs --tail=100 ismoretools
+sudo nginx -t
+```
+
+### Alternative: build static files outside the VPS
+
+If the VPS should not run the Node.js build, build the static export on a compatible machine:
+
+```bash
+npm ci
 npm run build
 ```
 
-Copy `out/`, `nginx.conf`, and `docker-compose.static.yml` to the server, then start nginx-only Docker Compose:
+Copy `out/`, `nginx.conf`, and `docker-compose.static.yml` to a directory on the VPS, then start the static Nginx container:
 
 ```bash
-docker compose -f docker-compose.static.yml up -d
+sudo docker compose -f docker-compose.static.yml up -d
 ```
 
-Then open:
-
-```text
-http://your-server-ip:8080
-```
-
-For production behind a reverse proxy, point Nginx/Caddy/Traefik to the container port `80`.
+That compose file listens on `127.0.0.1:8090`; in the Nginx proxy configuration above, change `proxy_pass` to `http://127.0.0.1:8090`.
 
 The project is configured for static export in `next.config.ts`:
 
