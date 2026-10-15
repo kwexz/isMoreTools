@@ -1,237 +1,116 @@
 # isMoreTools
 
+[![CI](https://github.com/kwexz/isMoreTools/actions/workflows/ci.yml/badge.svg)](https://github.com/kwexz/isMoreTools/actions/workflows/ci.yml)
+
 Privacy-friendly browser tools for developers, text, files, and images.
 
-isMoreTools is a static Next.js App Router project. It has no backend, no authentication, no analytics, no database, and no external processing APIs. User text, files, and images are processed locally in the browser with File API, Canvas API, Web Crypto API, URL API, and Clipboard API.
+isMoreTools is a **static Next.js App Router** app with **no backend**. Every tool runs
+entirely in your browser using the platform APIs (File, Canvas, Web Crypto, URL, Clipboard)
+— there are no accounts, no uploads, no analytics, and no external processing APIs.
 
-## Tech Stack
+> **Main feature: your data never leaves your device.** Text, files, and images are read
+> and processed locally, and downloads are generated on-device from Blob URLs.
 
-- Next.js App Router with static export
-- TypeScript strict
-- Tailwind CSS
-- shadcn-style reusable UI primitives
-- lucide-react icons
-- sonner toasts
-- yaml, jose, react-markdown, remark-gfm, rehype-sanitize, diff, exifr, browser-image-compression, react-easy-crop
+## Screenshots
 
-## Getting Started
+| Home | Tool catalog |
+| --- | --- |
+| ![Home page](docs/screenshots/01-home.png) | ![Tools catalog](docs/screenshots/02-tools-catalog.png) |
+| **JSON Formatter** | **Resize Images** |
+| ![JSON Formatter](docs/screenshots/03-json-formatter.png) | ![Resize Images](docs/screenshots/04-resize-images.png) |
 
-```bash
-npm install
-npm run dev
-npm run build
-```
+## Live demo
 
-## Deployment on a clean VPS (Docker + Nginx)
+No public demo is hosted yet. The fastest way to try it is to run it locally
+(see [Quick start](#quick-start)) — the app is a fully static export, so it also runs from
+any static file server.
 
-The production setup uses two Nginx instances: the Nginx container serves the static export, while Nginx on the VPS is the public reverse proxy and terminates HTTPS. The container is bound only to `127.0.0.1:8090`, so it is not directly reachable from the Internet.
+## What's inside
 
-These instructions target Ubuntu 22.04/24.04. Before starting, create an `A`/`AAAA` DNS record for the domain pointing to the VPS and make sure ports 80 and 443 are reachable from the Internet.
+**39 working tools** across six categories, plus 2 catalog-only entries:
 
-### 1. Prepare the server
+- **Data & Formats** — JSON Formatter, JSON Validator, YAML Formatter, YAML ↔ JSON Converter, URL Parser, Timestamp Converter
+- **Encoding & Security** — Base64 Encode/Decode, Hash Generator (SHA-1/256/384/512 + legacy MD5), JWT Decoder, JWT Encoder (unsigned or HS256), UUID Generator
+- **Text Tools** — Word/Character Counter, Clean Extra Spaces, Change Case, Transliteration, Slug Generator, Remove Duplicate Lines, Sort Lines, Extract Emails/URLs, Lorem Ipsum Generator
+- **File Tools** — MIME Type Viewer, File Checksum Generator, Compare Two Files, Batch Rename Preview, Generate Checksum File
+- **Image Tools** — Resize Images, Compress PNG/JPEG/WebP, Convert Images, PNG to SVG Converter, Crop Image, Remove Image Metadata, Generate Favicon Set, Extract Color Palette, Placeholder Generator
+- **Developer Utilities** — Regex Tester, Regex Builder, Markdown Preview (sanitized), Rich Text to Markdown, Diff Checker
 
-Connect by SSH and install Docker, Compose, Nginx, and Certbot:
+**Catalog-only (route and page exist, implementation planned):** Text Diff, File Size Converter.
 
-```bash
-sudo apt update
-sudo apt install -y ca-certificates curl gnupg nginx certbot python3-certbot-nginx
+## Tech stack
 
-sudo install -m 0755 -d /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-sudo chmod a+r /etc/apt/keyrings/docker.gpg
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo $VERSION_CODENAME) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-sudo apt update
-sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-```
+- [Next.js](https://nextjs.org/) 16 (App Router, `output: "export"` static export)
+- TypeScript (strict) and React 19
+- Tailwind CSS with shadcn-style UI primitives and `lucide-react` icons
+- Local-processing libraries: `yaml`, `jose`, `diff`, `exifr`, `browser-image-compression`,
+  `react-markdown` + `remark-gfm` + `rehype-sanitize`
 
-If UFW is enabled, allow SSH before enabling the firewall, then allow web traffic:
+## Quick start
 
-```bash
-sudo ufw allow OpenSSH
-sudo ufw allow 'Nginx Full'
-sudo ufw enable
-```
-
-### 2. Build locally and upload the static site (recommended for small VPS)
-
-Do **not** run `docker compose up --build` on a VPS with 1 vCPU and 1 GB RAM: the Next.js production build can exhaust its memory. Build the static site on a development machine or in CI instead:
+Requirements: Node.js 22+ (matches CI and the Docker image).
 
 ```bash
-npm ci
-npm run build
+npm ci        # install exact dependencies from package-lock.json
+npm run dev   # start the dev server at http://localhost:3000
 ```
 
-The build creates `out/`. Upload only the static deployment files to the VPS (replace the SSH user and address):
+Build and preview the static output:
 
 ```bash
-ssh <USER>@<SERVER> 'sudo mkdir -p /opt/ismoretools && sudo chown $USER:$USER /opt/ismoretools'
-scp -r out nginx.conf docker-compose.static.yml <USER>@<SERVER>:/opt/ismoretools/
+npm run build     # static export into out/
+npm run start     # serve out/ locally (npx serve out)
 ```
 
-On the VPS, start the lightweight Nginx-only container:
+## Privacy model
 
-```bash
-cd /opt/ismoretools
-sudo docker compose -f docker-compose.static.yml up -d
-sudo docker compose -f docker-compose.static.yml ps
-curl -I http://127.0.0.1:8090
-```
+The privacy claim is verifiable in the source: there is no backend to send data to.
 
-`curl` must return a successful HTTP response. This deployment does not install Node.js, download npm packages, or build anything on the VPS. The application has no runtime environment variables, database, or persistent volumes.
+- User text, files, and images are never uploaded. Tools read them with File/Canvas/Web
+  Crypto/URL/Clipboard APIs and produce results (and downloads) locally.
+- No server actions, no API routes, no auth, no database, no analytics, no third-party
+  scripts.
+- `localStorage` is used only for the theme preference; uploaded or pasted content is not
+  persisted.
+- The only network activity is loading the app's **own** static assets from its own origin.
+  The Inter font is fetched from Google Fonts **at build time** and then self-hosted by the
+  app, so the browser requests no third-party origins at runtime.
 
-### 3. Configure the public Nginx proxy
+See [`app/privacy`](app/privacy/page.tsx) for the in-app statement.
 
-Replace `example.com` with your domain and create `/etc/nginx/sites-available/ismoretools`. Use only names that already have a DNS `A`/`AAAA` record pointing to this VPS; for example, do not include `www.example.com` unless that record exists.
-
-```nginx
-server {
-    listen 80;
-    listen [::]:80;
-    server_name example.com;
-
-    location / {
-        proxy_pass http://127.0.0.1:8090;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-```
-
-Enable the configuration and verify it:
-
-```bash
-sudo ln -s /etc/nginx/sites-available/ismoretools /etc/nginx/sites-enabled/ismoretools
-sudo rm -f /etc/nginx/sites-enabled/default
-sudo nginx -t
-sudo systemctl reload nginx
-```
-
-### 4. Enable HTTPS
-
-After DNS has propagated, request a Let's Encrypt certificate and let Certbot configure HTTP-to-HTTPS redirect:
-
-```bash
-sudo certbot --nginx -d example.com --redirect
-sudo systemctl status certbot.timer
-```
-
-To serve `www.example.com` too, first create its DNS record (normally a `CNAME` to `example.com`, or an `A`/`AAAA` record to the same VPS). Add it to `server_name` and then request both names with `-d example.com -d www.example.com`. Test renewal once:
-
-```bash
-sudo certbot renew --dry-run
-```
-
-The site is now available at `https://example.com`.
-
-### Updating a static deployment
-
-Build the new `out/` directory locally, then synchronise it to the VPS and recreate the static container. `--delete` removes static files no longer present in the new build:
-
-```bash
-rsync -av --delete out/ <USER>@<SERVER>:/opt/ismoretools/out/
-ssh <USER>@<SERVER> 'cd /opt/ismoretools && sudo docker compose -f docker-compose.static.yml up -d --force-recreate'
-```
-
-Useful diagnostics:
-
-```bash
-sudo docker compose -f docker-compose.static.yml ps
-sudo docker compose -f docker-compose.static.yml logs --tail=100 ismoretools
-sudo nginx -t
-```
-
-#### `502 Bad Gateway` troubleshooting
-
-`502 Bad Gateway` means the host Nginx cannot reach the static-site container. On the VPS, run:
-
-```bash
-cd /opt/ismoretools
-sudo docker compose -f docker-compose.static.yml up -d --force-recreate
-sudo docker compose -f docker-compose.static.yml ps
-sudo docker compose -f docker-compose.static.yml logs --tail=100 ismoretools
-curl -I http://127.0.0.1:8090
-```
-
-The last command must return an HTTP response. If it does, ensure the host Nginx configuration contains exactly `proxy_pass http://127.0.0.1:8090;`, then apply it:
-
-```bash
-sudo nginx -t && sudo systemctl reload nginx
-```
-
-The project is configured for static export in `next.config.ts`:
-
-```ts
-output: "export"
-```
-
-## Project Structure
+## Project structure
 
 ```text
-app/
-components/
-data/
-lib/
-types/
+app/          routes (App Router), layout, home, tools, about, privacy
+components/    layout, tool UI, and tool implementations
+data/tools.ts  the tool catalog (slug, category, status, tags)
+lib/tools/     pure, dependency-light helpers (json, yaml, text, hash, files, images)
+types/         shared TypeScript types
+docs/          DEPLOYMENT.md and screenshots
 ```
 
-## Implemented Tools
+## Deployment
 
-- JSON Formatter
-- YAML Formatter
-- JSON Validator
-- YAML <-> JSON Converter
-- Base64 Encode/Decode
-- Hash Generator
-- JWT Decoder
-- JWT Encoder
-- UUID Generator
-- Timestamp Converter
-- URL Parser
-- Regex Tester
-- Regex Builder
-- Markdown Preview
-- Rich Text to Markdown
-- Diff Checker
-- Word/Character Counter
-- Clean Extra Spaces
-- Change Case
-- Transliteration
-- Slug Generator
-- Remove Duplicate Lines
-- Sort Lines
-- Extract Emails/URLs
-- Lorem Ipsum Generator
-- MIME Type Viewer
-- File Checksum Generator
-- Compare Two Files
-- Batch Rename Preview
-- Generate Checksum File
-- Resize Images
-- Compress PNG/JPEG/WebP
-- Convert Images
-- PNG to SVG Converter
-- Crop Image
-- Remove Image Metadata
-- Generate Favicon Set
-- Extract Color Palette
-- Placeholder Generator
+The app is a static export served by Nginx. The recommended small-VPS setup builds `out/`
+locally and runs a lightweight Nginx container bound to `127.0.0.1:8090`, with host Nginx
+as the HTTPS reverse proxy. Full step-by-step instructions (server prep, Docker, the Nginx
+site config, Let's Encrypt, updates, and `502` troubleshooting) are in
+[`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
 
-## Planned / Basic Catalog Entries
-
-- Text Diff
-- File Size Converter
-
-## Privacy Model
-
-- User content is not uploaded.
-- There are no server actions for processing user data.
-- There are no external APIs.
-- Files are not stored.
-- `localStorage` is used only for theme preference.
+A multi-stage [`Dockerfile`](Dockerfile) and [`docker-compose.yml`](docker-compose.yml) are
+also included for hosts that prefer to build the image directly.
 
 ## Verification
 
-`npm run build` successfully compiles the app, validates TypeScript, prerenders all routes, and exports the static site.
+The repository is checked by [`CI`](.github/workflows/ci.yml) on every push and pull
+request, running `npm ci`, `npm run typecheck`, `npm run lint`, and `npm run build`.
+
+| Command | Checks |
+| --- | --- |
+| `npm run typecheck` | `tsc --noEmit` across the whole project |
+| `npm run lint` | ESLint 9 (flat config via `eslint-config-next`) |
+| `npm run build` | Production build; prerenders all 47 routes and exports `out/` |
+
+## License
+
+[MIT](LICENSE)

@@ -98,7 +98,7 @@ function UrlParser() {
 }
 
 function TimestampConverter() {
-  const [value, setValue] = useState(String(Date.now()));
+  const [value, setValue] = useState(() => String(Date.now()));
   const date = useMemo(() => { const n = Number(value); return Number.isFinite(n) ? new Date(String(Math.trunc(Math.abs(n))).length <= 10 ? n * 1000 : n) : null; }, [value]);
   return <div className="space-y-5"><div className="flex gap-2"><Input value={value} onChange={(e) => setValue(e.target.value)} /><Button onClick={() => setValue(String(Date.now()))}>Now</Button></div>{date && !Number.isNaN(date.getTime()) ? <div className="grid gap-3 md:grid-cols-2"><Card className="p-4"><span className="text-xs text-muted-foreground">ISO</span><p className="font-mono">{date.toISOString()}</p></Card><Card className="p-4"><span className="text-xs text-muted-foreground">UTC</span><p>{date.toUTCString()}</p></Card><Card className="p-4"><span className="text-xs text-muted-foreground">Local</span><p>{date.toLocaleString()}</p></Card><Card className="p-4"><span className="text-xs text-muted-foreground">Timezone</span><p>{Intl.DateTimeFormat().resolvedOptions().timeZone}</p></Card></div> : <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-destructive">Enter Unix seconds or milliseconds.</div>}<HowItWorks>10-digit values are treated as Unix seconds; longer values are treated as milliseconds.</HowItWorks></div>;
 }
@@ -106,8 +106,14 @@ function TimestampConverter() {
 function Base64Tool() {
   const [mode, setMode] = useState<"encode" | "decode">("encode");
   const [input, setInput] = useState("Hello, мир!");
-  const [error, setError] = useState("");
-  const output = useMemo(() => { try { setError(""); if (mode === "encode") return btoa(String.fromCharCode(...new TextEncoder().encode(input))); return new TextDecoder().decode(Uint8Array.from(atob(input), (c) => c.charCodeAt(0))); } catch { setError("Input is not valid Base64 for decoding."); return ""; } }, [input, mode]);
+  const { output, error } = useMemo(() => {
+    try {
+      if (mode === "encode") return { output: btoa(String.fromCharCode(...new TextEncoder().encode(input))), error: "" };
+      return { output: new TextDecoder().decode(Uint8Array.from(atob(input), (c) => c.charCodeAt(0))), error: "" };
+    } catch {
+      return { output: "", error: "Input is not valid Base64 for decoding." };
+    }
+  }, [input, mode]);
   return <div className="space-y-5"><Select value={mode} onChange={(e) => setMode(e.target.value as "encode" | "decode")}><option value="encode">Encode</option><option value="decode">Decode</option></Select><Textarea className="min-h-48 font-mono" value={input} onChange={(e) => setInput(e.target.value)} /><OutputPanel value={output} error={error} /><HowItWorks>TextEncoder and TextDecoder make the conversion Unicode-safe before Base64 operations.</HowItWorks></div>;
 }
 
@@ -123,8 +129,14 @@ function HashGenerator({ fileOnly = false }: { fileOnly?: boolean }) {
 
 function JwtDecoder() {
   const [input, setInput] = useState("");
-  const [error, setError] = useState("");
-  const decoded = useMemo(() => { if (!input.trim()) return ""; try { setError(""); return JSON.stringify({ header: decodeProtectedHeader(input), payload: decodeJwt(input) }, null, 2); } catch (err) { setError(err instanceof Error ? err.message : "Invalid JWT."); return ""; } }, [input]);
+  const { decoded, error } = useMemo(() => {
+    if (!input.trim()) return { decoded: "", error: "" };
+    try {
+      return { decoded: JSON.stringify({ header: decodeProtectedHeader(input), payload: decodeJwt(input) }, null, 2), error: "" };
+    } catch (err) {
+      return { decoded: "", error: err instanceof Error ? err.message : "Invalid JWT." };
+    }
+  }, [input]);
   return <div className="space-y-5"><div className="rounded-xl border border-accent/50 bg-accent/10 p-3 text-sm"><AlertTriangle className="mr-2 inline h-4 w-4" />Decoded only. Signature is not verified.</div><Textarea className="min-h-40 font-mono" value={input} onChange={(e) => setInput(e.target.value)} placeholder="eyJ..." /><OutputPanel value={decoded} error={error} /><HowItWorks>jose decodes the protected header and payload locally without verifying trust or signatures.</HowItWorks></div>;
 }
 
