@@ -51,6 +51,7 @@ Requirements: Node.js 22+ (matches CI and the Docker image).
 ```bash
 npm ci        # install exact dependencies from package-lock.json
 npm run dev   # start the dev server at http://localhost:3000
+npm test      # run the unit tests (Vitest)
 ```
 
 Build and preview the static output:
@@ -87,6 +88,9 @@ types/         shared TypeScript types
 docs/          DEPLOYMENT.md and screenshots
 ```
 
+Tests are colocated with the code as `*.test.ts` / `*.test.tsx` and run with Vitest
+(`vitest.config.mts`, jsdom + Testing Library).
+
 ## Deployment
 
 The app is a static export served by Nginx. The recommended small-VPS setup builds `out/`
@@ -101,12 +105,14 @@ also included for hosts that prefer to build the image directly.
 ## Verification
 
 The repository is checked by [`CI`](.github/workflows/ci.yml) on every push and pull
-request, running `npm ci`, `npm run typecheck`, `npm run lint`, and `npm run build`.
+request, running `npm ci`, `npm run typecheck`, `npm run lint`, `npm test`, and
+`npm run build`.
 
 | Command | Checks |
 | --- | --- |
 | `npm run typecheck` | `tsc --noEmit` across the whole project |
 | `npm run lint` | ESLint 9 (flat config via `eslint-config-next`) |
+| `npm test` | Vitest unit tests for the `lib/tools` helpers and key catalog components |
 | `npm run build` | Production build; prerenders all 47 routes and exports `out/` |
 
 ## License
