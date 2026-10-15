@@ -5,8 +5,9 @@ export default defineConfig([
   ...nextVitals,
   {
     rules: {
-      // Intentional hydration-safe pattern: theme and URL query are read after mount.
-      "react-hooks/set-state-in-effect": "warn"
+      // Tool previews render from Blob/object URLs and the app ships an unoptimized
+      // static export, so the next/image optimizer cannot be used for them.
+      "@next/next/no-img-element": "off"
     }
   },
   globalIgnores([

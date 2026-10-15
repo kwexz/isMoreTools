@@ -27,16 +27,14 @@ any static file server.
 
 ## What's inside
 
-**39 working tools** across six categories, plus 2 catalog-only entries:
+**41 working tools** across six categories:
 
 - **Data & Formats** — JSON Formatter, JSON Validator, YAML Formatter, YAML ↔ JSON Converter, URL Parser, Timestamp Converter
 - **Encoding & Security** — Base64 Encode/Decode, Hash Generator (SHA-1/256/384/512 + legacy MD5), JWT Decoder, JWT Encoder (unsigned or HS256), UUID Generator
-- **Text Tools** — Word/Character Counter, Clean Extra Spaces, Change Case, Transliteration, Slug Generator, Remove Duplicate Lines, Sort Lines, Extract Emails/URLs, Lorem Ipsum Generator
-- **File Tools** — MIME Type Viewer, File Checksum Generator, Compare Two Files, Batch Rename Preview, Generate Checksum File
+- **Text Tools** — Word/Character Counter, Clean Extra Spaces, Change Case, Transliteration, Slug Generator, Remove Duplicate Lines, Sort Lines, Extract Emails/URLs, Lorem Ipsum Generator, Text Diff
+- **File Tools** — MIME Type Viewer, File Size Converter, File Checksum Generator, Compare Two Files, Batch Rename Preview, Generate Checksum File
 - **Image Tools** — Resize Images, Compress PNG/JPEG/WebP, Convert Images, PNG to SVG Converter, Crop Image, Remove Image Metadata, Generate Favicon Set, Extract Color Palette, Placeholder Generator
 - **Developer Utilities** — Regex Tester, Regex Builder, Markdown Preview (sanitized), Rich Text to Markdown, Diff Checker
-
-**Catalog-only (route and page exist, implementation planned):** Text Diff, File Size Converter.
 
 ## Tech stack
 

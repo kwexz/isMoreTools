@@ -23,6 +23,7 @@ export function CategorizedToolCatalog({
   useEffect(() => {
     const requested = new URLSearchParams(window.location.search).get("category");
     if (requested && categories.includes(requested as ToolCategory)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- the query param is read after mount to avoid a server/client hydration mismatch.
       setCategory(requested as ToolCategory);
     }
   }, []);

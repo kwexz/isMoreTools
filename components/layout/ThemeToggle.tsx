@@ -11,6 +11,7 @@ export function ThemeToggle() {
     const saved = localStorage.getItem("ismoretools-theme");
     const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
     const enabled = saved ? saved === "dark" : prefersDark;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- theme is read after mount so the state matches the pre-hydration <html> class and avoids a hydration mismatch.
     setDark(enabled);
     document.documentElement.classList.toggle("dark", enabled);
   }, []);

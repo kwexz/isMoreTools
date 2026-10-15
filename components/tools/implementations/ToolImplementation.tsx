@@ -741,6 +741,7 @@ export function ToolImplementation({ slug }: ToolProps) {
     case "markdown-preview": return <MarkdownPreview />;
     case "rich-text-to-markdown": return <RichTextToMarkdown />;
     case "diff-checker": return <DiffTool />;
+    case "text-diff": return <DiffTool />;
     case "word-counter": return <WordCounter />;
     case "clean-extra-spaces": return <CleanSpaces />;
     case "change-case": return <ChangeCaseTool />;
@@ -751,6 +752,7 @@ export function ToolImplementation({ slug }: ToolProps) {
     case "extract-emails-urls": return <ExtractEmailsUrls />;
     case "lorem-ipsum": return <LoremGenerator />;
     case "mime-type-viewer": return <MimeViewer />;
+    case "file-size-converter": return <FileSizeConverter />;
     case "compare-files": return <CompareFiles />;
     case "batch-rename-preview": return <BatchRenamePreview />;
     case "generate-checksum-file": return <ChecksumFile />;
